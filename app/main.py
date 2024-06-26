@@ -2,6 +2,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any
 import json
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -72,7 +77,7 @@ class ScoreKeeper:
 
     def _load_weights(self) -> Dict | None:
         try:
-            with open('./only_scores_output.json', 'r') as f:
+            with open('./scores.json', 'r') as f:
                 self.weights = json.load(f)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
@@ -110,9 +115,15 @@ class ScoreKeeper:
 @app.post("/calculate_scores/individual")
 def calculate_scores(user_answers: UserAnswers):
     try:
+        logger.info(f"Received answers: {user_answers.answers}")
+        if not user_answers.answers:
+            raise ValueError("Answers cannot be empty")
         sk = ScoreKeeper()
         normalized_scores = sk.calculate_individual(user_answers.answers, sk.instance.weights)
-        print(normalized_scores)
+        logger.info(f"Calculation result: {normalized_scores}")
         return {"traits_scores": normalized_scores}
+    except ValueError as ve:
+        logger.error(f"ValueError: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
